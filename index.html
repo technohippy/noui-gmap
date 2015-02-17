@@ -44,6 +44,7 @@
           requestAnimationFrame(positionLoop);
           var positions = ctracker.getCurrentPosition();
           if (positions === false) return;
+          if (!map) return;
 
           var d = distance(positions[7], positions[33]);
           // 30-80
