@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style type="text/css">
+      html, body, #map-canvas { height: 100%; margin: 0; padding: 0;}
+    </style>
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBrUVTs3ecApCuwFc79TTWOw-l5C27ZRGU">
+<!--
+    <script type="text/javascript" src="https://maps.googleapis.com/maps/api/js?"></script>
+-->
+    <script type="text/javascript">
+      var map;
+      function initialize() {
+        var mapOptions = {
+          center: { lat: 35.681382, lng: 139.745433},
+          zoom: 8
+        };
+        //var map = new google.maps.Map(document.getElementById('map-canvas'),
+        map = new google.maps.Map(document.getElementById('map-canvas'),
+            mapOptions);
+      }
+      google.maps.event.addDomListener(window, 'load', initialize);
+    </script>
+  </head>
+  <body>
+    <div id="map-canvas"></div>
+    <video width="400" height="300" style="z-index:1; position:absolute; top:-301px; right:0;"></video>
+    <script type="text/javascript" src="./clmtrackr.min.js"></script><!-- https://github.com/auduno/clmtrackr -->
+    <script type="text/javascript" src="./model_pca_20_svm.js"></script>
+    <script>
+      function distance(p1, p2) {
+        return Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2));
+      }
+
+      function startTracking(video) {
+        var ctracker = new clm.tracker();
+        ctracker.init(pModel);
+        ctracker.start(video);
+
+        var zooms = [];
+        var zoomSize = 10;
+
+        (function positionLoop() {
+          requestAnimationFrame(positionLoop);
+          var positions = ctracker.getCurrentPosition();
+          if (positions === false) return;
+
+          var d = distance(positions[7], positions[33]);
+          // 30-80
+          while (zoomSize < zooms.length) zooms.shift();
+          var zoom = d/10.0 + 5;
+          zooms.push(zoom);
+          var aveZoom = Math.round(zooms.reduce(function(sum, current) {
+              return sum + current;
+            }, 0) / zooms.length);
+          var currentZoom = map.getZoom();
+          var nextZoom = currentZoom === aveZoom ? currentZoom :
+            currentZoom < aveZoom ? currentZoom + 1 : currentZoom - 1;
+          map.setZoom(nextZoom);
+
+          var bounds = map.getBounds();
+          var center = bounds.getCenter();
+          var northEast = bounds.getNorthEast();
+          var dd = Math.abs(northEast.lng() - center.lng()) / 100;
+          var l = distance(positions[0], positions[23]);
+          var r = distance(positions[14], positions[28]);
+          if (l * 2 < r) {
+            map.setCenter({lat:center.lat(), lng:center.lng() + dd});
+          }
+          else if (r * 2 < l) {
+            map.setCenter({lat:center.lat(), lng:center.lng() - dd});
+          }
+        })();
+      }
+
+      navigator.getUserMedia = (navigator.getUserMedia ||
+                                navigator.webkitGetUserMedia ||
+                                navigator.mozGetUserMedia ||
+                                navigator.msGetUserMedia);
+
+      if (navigator.getUserMedia) {
+        navigator.getUserMedia (
+          {video: true, audio: true},
+          function(localMediaStream) {
+            var video = document.querySelector('video');
+            video.src = window.URL.createObjectURL(localMediaStream);
+            video.play();
+            startTracking(video);
+          },
+          function(err) {
+            console.log("The following error occured: " + err);
+          }
+        );
+      } else {
+        console.log("getUserMedia not supported");
+      }
+    </script>
+  </body>
+</html>
